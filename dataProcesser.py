@@ -7,14 +7,35 @@ def importData(fileName, imageDirectory):
     Принимает  fileName: имя файла данных в строковой форме, например. "data/telemetry.txt"
     Принимает  imageDirectory: имя каталога, в котором хранятся изображения. "data/"
     Возвращает dataMatrix: массив NumPy ndArray, содержащий все данные позиции, где в каждой строке 
-                            хранится 6 плавающих элементов, содержащих информацию в форме XYZYPR.
+                            хранится 6 плавающих элементов, содержащих информацию в форме [XYZYPR].
     Возвращает allImages: список Python NumPy ndArrays, содержащий изображения.
     '''
     allImages = [] # Список изображений
     fileNameMatrix = np.genfromtxt(fileName,delimiter=",",usecols=[0],dtype=str) # чтение имени файла-изображения
     dataMatrix = np.genfromtxt(fileName,delimiter=",",usecols=range(1,7),dtype=float) # чтение числовых данных
+
+    # чтение изображений по имени файла из текстового документа
     for i in range(0,fileNameMatrix.shape[0]): 
-        allImages.append(cv2.imread(imageDirectory+fileNameMatrix[i])) # чтение изображений
+        allImages.append(cv2.imread(imageDirectory+fileNameMatrix[i]))
+    
+    # перевод характеристик дрона Lat и Lon в координаты x,y,z
+    for i in range(0,fileNameMatrix.shape[0]): 
+        lat = dataMatrix[[i],[0]]
+        lon = dataMatrix[[i],[1]]
+        temp = dataMatrix[[i],[3]]
+        # Вычисление координат
+        lat, lon = np.deg2rad(lat), np.deg2rad(lon) # перевод градусных мер в радианную
+        EarthRad = 6371 # приблизительный радиус Земли в километрах
+        x = EarthRad * np.cos(lat) * np.cos(lon) # Вычисление координаты x
+        y = EarthRad * np.cos(lat) * np.sin(lon) # Вычисление координаты y
+        z = EarthRad * np.sin(lat) # Вычисление координаты z
+        # Присвоение списку ndarray вычисленных значений
+        dataMatrix[[i],[0]] = x
+        dataMatrix[[i],[1]] = y
+        dataMatrix[[i],[2]] = z
+        dataMatrix[[i],[3]] = dataMatrix[[i],[5]]
+        dataMatrix[[i],[5]] = temp
+    
     return allImages, dataMatrix
 
 
