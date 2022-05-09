@@ -8,7 +8,7 @@ import imageMapper
 import dataProcesser
 
 
-fileName = "data/telemetry.txt"
+fileName = "data/telemetry-comma.txt" # Фотографии (кроме первых двух) расположены https://drive.google.com/drive/folders/1bK5iiO7Ioe75V111r9WF0tYe4PayuW1C
 imageDirectory = "data/"
 allImages, dataMatrix = dataProcesser.importData(fileName, imageDirectory)
 myCombiner = imageMapper.Mapper(allImages, dataMatrix)
