@@ -3,7 +3,6 @@ import copy
 import numpy as np
 import imageGeometry as gm
 import dataProcesser as datproc
-# import matplotlib.pyplot as plt
 
 
 class Mapper:
@@ -75,6 +74,8 @@ class Mapper:
         # Визуализация совпадений
         matchDrawing = datproc.drawMatches(gray2,kp2,gray1,kp1,matches)
         datproc.display("matches",matchDrawing)
+        # Сохранение изображения в папку "matches/"
+        # cv2.imwrite("matches/match"+str(index2)+".png",matchDrawing) 
 
         # Синтаксис NumPy для извлечения данных о местоположении из структуры данных соответствия в матричной форме
         src_pts = np.float32([ kp2[m.queryIdx].pt for m in matches ]).reshape(-1,1,2)
@@ -85,13 +86,11 @@ class Mapper:
         Идея: поскольку мы исправили ориентацию камеры, векторного преобразования должно хватить для выравнивания изображений.
         '''
         # оценка RigidTransform - Вычисляет универсальное векторного преобразование между двумя наборами двумерных точек.
-        fullAffine=False
-        A = cv2.estimateAffinePartial2D(src_pts,dst_pts) # false, потому что нам нужно только 5 DOF.
-                                                         # при вращении было уделено 3 DOF
+        # A = cv2.estimateAffinePartial2D(src_pts,dst_pts) # fullAffine = False
         # if A == None: # Если RANSAC дал сбой в estimateAffinePartial2D(), 
                       # то выполняется попытка полной гомографии.
                       # https://waksoft.susu.ru/2020/03/26/primery-gomogrfii-s-ispolzovaniem-opencv/
-        HomogResult = cv2.findHomography(src_pts,dst_pts,method=cv2.RANSAC)
+        HomogResult = cv2.findHomography(src_pts, dst_pts, method=cv2.RANSAC)
         H = HomogResult[0]
 
         '''
@@ -110,13 +109,13 @@ class Mapper:
             cornerX = corners2[i,0]
             cornerY = corners2[i,1]
 
-            # if A != None: #check if we're working with affine transform or perspective transform
+            # if A != None: # проверка, работы с векторным преобразованием или перспективным преобразованием
             #     warpedCorners2[i,0] = A[0,0]*cornerX + A[0,1]*cornerY + A[0,2]
             #     warpedCorners2[i,1] = A[1,0]*cornerX + A[1,1]*cornerY + A[1,2]
             # else:
-            #     warpedCorners2[i,0] = (H[0,0]*cornerX + H[0,1]*cornerY + H[0,2])/(H[2,0]*cornerX + H[2,1]*cornerY + H[2,2])
-            #     warpedCorners2[i,1] = (H[1,0]*cornerX + H[1,1]*cornerY + H[1,2])/(H[2,0]*cornerX + H[2,1]*cornerY + H[2,2])
-
+            warpedCorners2[i,0] = (H[0,0]*cornerX + H[0,1]*cornerY + H[0,2]) / (H[2,0]*cornerX + H[2,1]*cornerY + H[2,2])
+            warpedCorners2[i,1] = (H[1,0]*cornerX + H[1,1]*cornerY + H[1,2]) / (H[2,0]*cornerX + H[2,1]*cornerY + H[2,2])
+            
         allCorners = np.concatenate((corners1, warpedCorners2), axis=0)
         [xMin, yMin] = np.int32(allCorners.min(axis=0).ravel() - 0.5)
         [xMax, yMax] = np.int32(allCorners.max(axis=0).ravel() + 0.5)
@@ -130,6 +129,10 @@ class Mapper:
         # if A is None:
         fullTransformation = np.dot(translation,H) # изображения должны быть переведены, чтобы быть полностью видимыми на новом холсте.
         warpedImage2 = cv2.warpPerspective(image2, fullTransformation, (xMax-xMin, yMax-yMin))
+        mask2 = cv2.threshold(warpedImage2, 0, 255, cv2.THRESH_BINARY)[1]
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3,3))
+        mask2 = cv2.morphologyEx(mask2, cv2.MORPH_ERODE, kernel)
+        warpedImage2[mask2==0] = 0
         # else:
         #     warpedImageTemp = cv2.warpPerspective(image2, translation, (xMax-xMin, yMax-yMin))
         #     warpedImage2 = cv2.warpAffine(warpedImageTemp, A, (xMax-xMin, yMax-yMin)) # Векторная трансформация
