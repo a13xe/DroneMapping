@@ -8,14 +8,18 @@ import dataProcesser as datproc
 class Mapper:
     def __init__(self,imageList_,dataMatrix_):
         '''
-        Принимает imageList_  : список всех изображений в наборе данных.
-        Принимает dataMatrix_ : Матрица, содержащая числовые данные о положении дрона.
+        ===============================================================================================
+        Функция, запускаемая при инициализации класса.
+        ===============================================================================================
+        Принимает : imageList_  (Тип: ndArray) - список всех изображений.
+        Принимает : dataMatrix_ (Тип: ndArray) - матрица, содержащая числовые данные о положении дрона.
+        ===============================================================================================
         '''
         self.imageList = []
         self.dataMatrix = dataMatrix_
         detector = cv2.ORB()
         for i in range(0,len(imageList_)):
-            image = imageList_[i][::3,::3,:] # уменьшите разрешение изображения, чтобы ускорить процесс.
+            image = imageList_[i][::3,::3,:] # уменьшение разрешения изоблражения для ускорения процесса сопоставления.
             M = gm.computeUnRotMatrix(self.dataMatrix[i,:])
             # Выполнение перспективного преобразования на основе информации о положении дрона.
             # В лечшем случае это сделает каждое изображение таким, как будто оно просматривается сверху (ортоизображение).
@@ -33,8 +37,14 @@ class Mapper:
 
     def combine(self, index2):
         '''
-        Принимает index2 : индекс self.imageList и self.kpList для объединения с self.referenceImage и self.referenceKeypoints
-        Возвращает комбинацию двух изображений
+        ===============================================================================================
+        Функция для наложения друг на друга двух фотоснимков.
+        ===============================================================================================
+        Принимает : index2 - индекс self.imageList и self.kpList для объединения с self.referenceImage 
+            и self.referenceKeypoints
+        ===============================================================================================
+        Возвращает: result - комбинация двух изображений
+        ===============================================================================================
         '''
         # Попытка объединить одну пару изображений на каждом шаге. 
         # Предпологается, что порядок, в котором даны изображения, является наилучшим порядком.
@@ -44,8 +54,7 @@ class Mapper:
         '''
         Нахождение ключевых точек и вычисление дескриптора.
         '''
-        detector = cv2.BRISK_create()
-        # detector.extended = True
+        detector = cv2.SIFT_create() # Альтернативой может послужить метод BRISK_create()
         gray1 = cv2.cvtColor(image1,cv2.COLOR_BGR2GRAY)
         ret1, mask1 = cv2.threshold(gray1,1,255,cv2.THRESH_BINARY)
         kp1, descriptors1 = detector.detectAndCompute(image1, None)
@@ -57,10 +66,10 @@ class Mapper:
         '''
         Визуализация процедуры сопоставления
         '''
-        keypoints1Im = cv2.drawKeypoints(image1,kp1,outImage = None,color=(0,0,255))
-        datproc.display("KEYPOINTS",keypoints1Im)
-        keypoints2Im = cv2.drawKeypoints(image2,kp2,outImage = None,color=(0,0,255))
-        datproc.display("KEYPOINTS",keypoints2Im)
+        keypoints1Im = cv2.drawKeypoints(image1,kp1,outImage = None,color=(0,100,255))
+        datproc.display("Ключевые точки",keypoints1Im)
+        keypoints2Im = cv2.drawKeypoints(image2,kp2,outImage = None,color=(0,100,255))
+        datproc.display("Ключевые точки",keypoints2Im)
 
         matcher = cv2.BFMatcher() # использование грубого сопоставление
         matches = matcher.knnMatch(descriptors2,descriptors1, k=2) # нахождение пары ближайших совпадений
@@ -73,7 +82,7 @@ class Mapper:
 
         # Визуализация совпадений
         matchDrawing = datproc.drawMatches(gray2,kp2,gray1,kp1,matches)
-        datproc.display("matches",matchDrawing)
+        datproc.display("Совпадения",matchDrawing)
         # Сохранение изображения в папку "matches/"
         # cv2.imwrite("matches/match"+str(index2)+".png",matchDrawing) 
 
@@ -83,36 +92,25 @@ class Mapper:
 
         '''
         Выполнение векторного преобразования (Affine Transform)
-        Идея: поскольку мы исправили ориентацию камеры, векторного преобразования должно хватить для выравнивания изображений.
+        Векторного преобразования должно хватить для выравнивания изображений.
         '''
-        # оценка RigidTransform - Вычисляет универсальное векторного преобразование между двумя наборами двумерных точек.
-        # A = cv2.estimateAffinePartial2D(src_pts,dst_pts) # fullAffine = False
-        # if A == None: # Если RANSAC дал сбой в estimateAffinePartial2D(), 
-                      # то выполняется попытка полной гомографии.
-                      # https://waksoft.susu.ru/2020/03/26/primery-gomogrfii-s-ispolzovaniem-opencv/
+        # Выполнение полной гомографии https://waksoft.susu.ru/2020/03/26/primery-gomogrfii-s-ispolzovaniem-opencv/
         HomogResult = cv2.findHomography(src_pts, dst_pts, method=cv2.RANSAC)
         H = HomogResult[0]
 
         '''
-        Вычислить 4 местоположения углов изображения
-        Идея: Тот же процесс, что и для warpPerspectiveWithPadding(), за исключением
-              того, что должны учитываться размеры двух изображений.
+        Вычисление местоположения углов изображения
+        Тот же процесс, что и для warpPerspectiveWithPadding(), только за исключением того, что должны учитываться размеры двух изображений.
         '''
         height1,width1 = image1.shape[:2]
         height2,width2 = image2.shape[:2]
         corners1 = np.float32(([0,0],[0,height1],[width1,height1],[width1,0]))
         corners2 = np.float32(([0,0],[0,height2],[width2,height2],[width2,0]))
-        # zeros() возвращает новый массив указанной формы и типа, заполненный нулями
-        warpedCorners2 = np.zeros((4,2)) 
+        warpedCorners2 = np.zeros((4,2)) # zeros() возвращает новый массив указанной формы и типа, заполненный нулями
 
         for i in range(0,4):
             cornerX = corners2[i,0]
             cornerY = corners2[i,1]
-
-            # if A != None: # проверка, работы с векторным преобразованием или перспективным преобразованием
-            #     warpedCorners2[i,0] = A[0,0]*cornerX + A[0,1]*cornerY + A[0,2]
-            #     warpedCorners2[i,1] = A[1,0]*cornerX + A[1,1]*cornerY + A[1,2]
-            # else:
             warpedCorners2[i,0] = (H[0,0]*cornerX + H[0,1]*cornerY + H[0,2]) / (H[2,0]*cornerX + H[2,1]*cornerY + H[2,2])
             warpedCorners2[i,1] = (H[1,0]*cornerX + H[1,1]*cornerY + H[1,2]) / (H[2,0]*cornerX + H[2,1]*cornerY + H[2,2])
             
@@ -126,20 +124,12 @@ class Mapper:
         translation = np.float32(([1,0,-1*xMin],[0,1,-1*yMin],[0,0,1]))
         warpedResImg = cv2.warpPerspective(self.resultImage, translation, (xMax-xMin, yMax-yMin))
         
-        # if A is None:
         fullTransformation = np.dot(translation,H) # изображения должны быть переведены, чтобы быть полностью видимыми на новом холсте.
         warpedImage2 = cv2.warpPerspective(image2, fullTransformation, (xMax-xMin, yMax-yMin))
         mask2 = cv2.threshold(warpedImage2, 0, 255, cv2.THRESH_BINARY)[1]
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3,3))
         mask2 = cv2.morphologyEx(mask2, cv2.MORPH_ERODE, kernel)
         warpedImage2[mask2==0] = 0
-        # else:
-        #     warpedImageTemp = cv2.warpPerspective(image2, translation, (xMax-xMin, yMax-yMin))
-        #     warpedImage2 = cv2.warpAffine(warpedImageTemp, A, (xMax-xMin, yMax-yMin)) # Векторная трансформация
-        #     mask2 = cv2.threshold(warpedImage2, 0, 255, cv2.THRESH_BINARY)[1]
-        #     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3,3))
-        #     mask2 = cv2.morphologyEx(mask2, cv2.MORPH_ERODE, kernel)
-        #     warpedImage2[mask2==0] = 0
 
         self.imageList[index2] = copy.copy(warpedImage2) # обновление старых изображений для извлечения функций в будущем
 
@@ -157,8 +147,8 @@ class Mapper:
         warpedImage2[:,:,1] = warpedImage2[:,:,1]*mask3
         warpedImage2[:,:,2] = warpedImage2[:,:,2]*mask3
 
-        result = warpedResImg + warpedImage2
         # отображение и сохранение результата
+        result = warpedResImg + warpedImage2
         self.resultImage = result
         datproc.display("orthophoto",result)
         cv2.imwrite("orthophoto"+str(index2)+".png",result)
