@@ -17,9 +17,19 @@ class Mapper:
         '''
         self.imageList = []
         self.dataMatrix = dataMatrix_
-        detector = cv2.ORB()
+        # Процент сжатия изображений
+        scale_percent = 30
+        # Расчет разрешения изображений, при условии если все фотографии с одного дрона (фотографии имеют одно разрешение)
+        # Если изображения будут иметь слишком низкое разрешение 
+        width = int(imageList_[0].shape[1] * scale_percent / 100)
+        height = int(imageList_[0].shape[0] * scale_percent / 100)
+        dsize = (width, height)
+        # обработка изображений
         for i in range(0,len(imageList_)):
-            image = imageList_[i][::3,::3,:] # уменьшение разрешения изоблражения для ускорения процесса сопоставления.
+            width = int(imageList_[1].shape[1] * 30 / 100)
+            height = int(imageList_[1].shape[0] * 30 / 100)
+            image = imageList_[i]
+            image = cv2.resize(image, dsize)
             M = gm.computeUnRotMatrix(self.dataMatrix[i,:])
             # Выполнение перспективного преобразования на основе информации о положении дрона.
             # В лечшем случае это сделает каждое изображение таким, как будто оно просматривается сверху (ортоизображение).
@@ -57,11 +67,11 @@ class Mapper:
         detector = cv2.SIFT_create() # Альтернативой может послужить метод BRISK_create()
         gray1 = cv2.cvtColor(image1,cv2.COLOR_BGR2GRAY)
         ret1, mask1 = cv2.threshold(gray1,1,255,cv2.THRESH_BINARY)
-        kp1, descriptors1 = detector.detectAndCompute(image1, None)
+        kp1, descriptors1 = detector.detectAndCompute(image1, mask1)
 
         gray2 = cv2.cvtColor(image2,cv2.COLOR_BGR2GRAY)
         ret2, mask2 = cv2.threshold(gray2,1,255,cv2.THRESH_BINARY)
-        kp2, descriptors2 = detector.detectAndCompute(image2, None)
+        kp2, descriptors2 = detector.detectAndCompute(image2, mask2)
 
         '''
         Визуализация процедуры сопоставления
@@ -76,7 +86,7 @@ class Mapper:
         # обрезка плохих совпадений
         good = []
         for m,n in matches:
-            if m.distance < 0.55*n.distance:
+            if m.distance < 0.55 * n.distance:
                 good.append(m)
         matches = copy.copy(good)
 
@@ -91,15 +101,17 @@ class Mapper:
         dst_pts = np.float32([ kp1[m.trainIdx].pt for m in matches ]).reshape(-1,1,2)
 
         '''
-        Выполнение векторного преобразования (Affine Transform)
-        Векторного преобразования должно хватить для выравнивания изображений.
+        Выполнение аффинного преобразования (Affine Transform)
+        Аффинного преобразования должно хватить для выравнивания изображений.
         '''
         # Выполнение полной гомографии https://waksoft.susu.ru/2020/03/26/primery-gomogrfii-s-ispolzovaniem-opencv/
-        HomogResult = cv2.findHomography(src_pts, dst_pts, method=cv2.RANSAC)
-        H = HomogResult[0]
+        A = cv2.estimateAffinePartial2D(src_pts,dst_pts)[0]
+        if A.any() == None: 
+            HomogResult = cv2.findHomography(src_pts, dst_pts, method=cv2.RANSAC)
+            H = HomogResult[0]
 
         '''
-        Вычисление местоположения углов изображения
+        Вычисление местоположения углов изображения.
         Тот же процесс, что и для warpPerspectiveWithPadding(), только за исключением того, что должны учитываться размеры двух изображений.
         '''
         height1,width1 = image1.shape[:2]
@@ -111,8 +123,15 @@ class Mapper:
         for i in range(0,4):
             cornerX = corners2[i,0]
             cornerY = corners2[i,1]
-            warpedCorners2[i,0] = (H[0,0]*cornerX + H[0,1]*cornerY + H[0,2]) / (H[2,0]*cornerX + H[2,1]*cornerY + H[2,2])
-            warpedCorners2[i,1] = (H[1,0]*cornerX + H[1,1]*cornerY + H[1,2]) / (H[2,0]*cornerX + H[2,1]*cornerY + H[2,2])
+            if A.any() != None: # аффинное или перспективное преобразование
+                warpedCorners2[i,0] = A[0,0]*cornerX + A[0,1]*cornerY + A[0,2]
+                warpedCorners2[i,1] = A[1,0]*cornerX + A[1,1]*cornerY + A[1,2]
+            else:
+                warpedCorners2[i,0] = (H[0,0]*cornerX + H[0,1]*cornerY + H[0,2])/(H[2,0]*cornerX + H[2,1]*cornerY + H[2,2])
+                warpedCorners2[i,1] = (H[1,0]*cornerX + H[1,1]*cornerY + H[1,2])/(H[2,0]*cornerX + H[2,1]*cornerY + H[2,2])
+        allCorners = np.concatenate((corners1, warpedCorners2), axis=0)
+        [xMin, yMin] = np.int32(allCorners.min(axis=0).ravel() - 0.5)
+        [xMax, yMax] = np.int32(allCorners.max(axis=0).ravel() + 0.5)
             
         allCorners = np.concatenate((corners1, warpedCorners2), axis=0)
         [xMin, yMin] = np.int32(allCorners.min(axis=0).ravel() - 0.5)
@@ -123,13 +142,16 @@ class Mapper:
         '''
         translation = np.float32(([1,0,-1*xMin],[0,1,-1*yMin],[0,0,1]))
         warpedResImg = cv2.warpPerspective(self.resultImage, translation, (xMax-xMin, yMax-yMin))
-        
-        fullTransformation = np.dot(translation,H) # изображения должны быть переведены, чтобы быть полностью видимыми на новом холсте.
-        warpedImage2 = cv2.warpPerspective(image2, fullTransformation, (xMax-xMin, yMax-yMin))
-        mask2 = cv2.threshold(warpedImage2, 0, 255, cv2.THRESH_BINARY)[1]
-        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3,3))
-        mask2 = cv2.morphologyEx(mask2, cv2.MORPH_ERODE, kernel)
-        warpedImage2[mask2==0] = 0
+        if A.any() == None:
+            fullTransformation = np.dot(translation,H) #again, images must be translated to be 100% visible in new canvas
+            warpedImage2 = cv2.warpPerspective(image2, fullTransformation, (xMax-xMin, yMax-yMin))
+        else:
+            warpedImageTemp = cv2.warpPerspective(image2, translation, (xMax-xMin, yMax-yMin))
+            warpedImage2 = cv2.warpAffine(warpedImageTemp, A, (xMax-xMin, yMax-yMin))
+            mask2 = cv2.threshold(warpedImage2, 0, 255, cv2.THRESH_BINARY)[1]
+            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3,3))
+            mask2 = cv2.morphologyEx(mask2, cv2.MORPH_ERODE, kernel)
+            warpedImage2[mask2==0] = 0
 
         self.imageList[index2] = copy.copy(warpedImage2) # обновление старых изображений для извлечения функций в будущем
 
