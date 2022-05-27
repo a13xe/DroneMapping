@@ -68,7 +68,7 @@ class Mapper:
         '''
         Нахождение ключевых точек и вычисление дескриптора.
         '''
-        detector = cv2.SIFT_create() # Альтернативой может послужить метод BRISK_create() или ORB
+        detector = cv2.SIFT_create(5000) # Альтернативой может послужить метод BRISK_create(), AKAZE_create(), ORB_create()
         gray1 = cv2.cvtColor(image1,cv2.COLOR_BGR2GRAY)
         ret1, mask1 = cv2.threshold(gray1,1,255,cv2.THRESH_BINARY)
         kp1, descriptors1 = detector.detectAndCompute(image1, mask1)
