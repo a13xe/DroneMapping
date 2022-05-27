@@ -17,6 +17,7 @@ def importData(fileName, imageDirectory):
     Возвращает: allImages (Тип: NumPy ndArray) - список, содержащий изображения.
     ===============================================================================================
     '''
+    print("[INFO] Загрузка данных ...")
     allImages = [] # Массив изображений
     fileNameMatrix = np.genfromtxt(fileName,delimiter=",",usecols=[0],dtype=str) # чтение имени файла-изображения
     dataMatrix = np.genfromtxt(fileName,delimiter=",",usecols=range(1,7),dtype=float) # чтение числовых данных
@@ -63,7 +64,7 @@ def display(title, image):
     cv2.resizeWindow(title,1600,900)
     cv2.moveWindow(title,0,0)
     cv2.imshow(title,image)
-    cv2.waitKey(800)
+    cv2.waitKey(1000)
     cv2.destroyWindow(title)
 
 
