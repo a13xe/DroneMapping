@@ -17,9 +17,10 @@ class Mapper:
         '''
         self.imageList = []
         self.dataMatrix = dataMatrix_
-        # Процент сжатия изображений
-        # для более точгного результата рекомендуется указать значение в 50%
-        # уменьшение разрешения снимка для ускорения работы программы (30% - минимальное для удовлетворительного результата)
+        # Процент сжатия изображений.
+        # Уменьшение разрешения снимка для ускорения работы программы .
+        # Для более точгного результата рекомендуется указать значение в 40-50%.
+        # (30% - минимальное для удовлетворительного результата значение, полученное экспериментальным путем для данного набора фотографий.)
         scale_percent = 30
         # Расчет разрешения изображений, при условии если все фотографии с одного дрона (фотографии имеют одно соотношение сторон и разрешение)
         # Если изображения будут иметь слишком низкое разрешение 
@@ -42,6 +43,7 @@ class Mapper:
 
 
     def createMosaic(self):
+        print("[INFO] Нахождение ключевых точек и вычисление дескриптора ...")
         for i in range(1,len(self.imageList)):
             self.combine(i)
         return self.resultImage
@@ -66,7 +68,7 @@ class Mapper:
         '''
         Нахождение ключевых точек и вычисление дескриптора.
         '''
-        detector = cv2.SIFT_create() # Альтернативой может послужить метод BRISK_create()
+        detector = cv2.SIFT_create() # Альтернативой может послужить метод BRISK_create() или ORB
         gray1 = cv2.cvtColor(image1,cv2.COLOR_BGR2GRAY)
         ret1, mask1 = cv2.threshold(gray1,1,255,cv2.THRESH_BINARY)
         kp1, descriptors1 = detector.detectAndCompute(image1, mask1)
@@ -107,6 +109,7 @@ class Mapper:
         Аффинного преобразования должно хватить для выравнивания изображений.
         '''
         # Выполнение полной гомографии https://waksoft.susu.ru/2020/03/26/primery-gomogrfii-s-ispolzovaniem-opencv/
+        # Функция estimateAffinePartial2D ищет такие преобразования как поворот, масштабирование и перенос.
         A = cv2.estimateAffinePartial2D(src_pts,dst_pts)[0]
         if A.any() == None: 
             HomogResult = cv2.findHomography(src_pts, dst_pts, method=cv2.RANSAC)
@@ -145,7 +148,7 @@ class Mapper:
         translation = np.float32(([1,0,-1*xMin],[0,1,-1*yMin],[0,0,1]))
         warpedResImg = cv2.warpPerspective(self.resultImage, translation, (xMax-xMin, yMax-yMin))
         if A.any() == None:
-            fullTransformation = np.dot(translation,H) #again, images must be translated to be 100% visible in new canvas
+            fullTransformation = np.dot(translation,H) # изображения должны быть перемещены, чтобы быть на 100% видимыми на новом холсте.
             warpedImage2 = cv2.warpPerspective(image2, fullTransformation, (xMax-xMin, yMax-yMin))
         else:
             warpedImageTemp = cv2.warpPerspective(image2, translation, (xMax-xMin, yMax-yMin))
@@ -175,6 +178,6 @@ class Mapper:
         result = warpedResImg + warpedImage2
         self.resultImage = result
         datproc.display("orthophoto",result)
-        cv2.imwrite("orthophoto"+str(index2)+".png",result)
+        cv2.imwrite("results/orthophoto"+str(index2)+".png",result)
         
         return result
