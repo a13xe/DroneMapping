@@ -16,6 +16,7 @@
 
 
 import cv2
+import shutil
 import imageMapper
 import dataProcesser
 import ImageMapperDynamic
@@ -27,8 +28,8 @@ method = 0
 
 # Выполнение накидного монтажа для двух изображений
 if method == 0:
-    # shutil.copyfile('data/2020_07_03_PhotoCamera_g401b40179_f001_028.JPG', 'res.JPG')
-    img1 = "data/2020_07_03_PhotoCamera_g401b40179_f001_030.JPG"
+    shutil.copyfile('data/2020_07_03_PhotoCamera_g401b40179_f001_028.JPG', 'res.JPG')
+    img1 = "data/2020_07_03_PhotoCamera_g401b40179_f001_039.JPG"
     img2 = "res.JPG"
     ImageMapperDynamic.stitchImages(img1, img2)
 
