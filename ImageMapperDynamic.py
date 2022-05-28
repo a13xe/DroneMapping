@@ -1,5 +1,11 @@
+from asyncio.windows_events import NULL
+from faulthandler import disable
 import cv2
 import dataProcesser as datproc
+
+
+OPENCV_OPENCL_RUNTIME = NULL
+OPENCV_OPENCL_DEVICE = disable
 
 
 def stitchImages(img1, img2):
