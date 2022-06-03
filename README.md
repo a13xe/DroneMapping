@@ -17,3 +17,6 @@
 # 
 ![image](https://user-images.githubusercontent.com/77492646/170790261-6fdaaf5b-b6fb-426c-8fc4-ec49de8b974d.png)
 # 
+
+**Отчет о проделанной работе:** https://drive.google.com/file/d/1vOTWhNjUPAR5rHJjedIPHP1l_qCgZN8r/view?usp=sharing
+**Презентация:** https://drive.google.com/file/d/1caB8YIQUFBLsXuTqd7YbH0iTz8z8Eohp/view?usp=sharing
